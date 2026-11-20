@@ -49,13 +49,13 @@ Dibangun dengan **Laravel 10** dan **MySQL**.
    ```
    Di Windows CMD, gunakan `copy .env.example .env`.
 
-4. **Buat database** bernama `sigap` (collation `utf8mb4_unicode_ci`) lewat phpMyAdmin atau MySQL, lalu sesuaikan `.env`:
+4. **Buat database** bernama `db_sigap` (collation `utf8mb4_unicode_ci`) lewat phpMyAdmin atau MySQL, lalu sesuaikan `.env`:
    ```env
    APP_NAME=SIGAP
    DB_CONNECTION=mysql
    DB_HOST=127.0.0.1
    DB_PORT=3306
-   DB_DATABASE=sigap
+   DB_DATABASE=db_sigap
    DB_USERNAME=root
    DB_PASSWORD=
    ```
@@ -73,13 +73,11 @@ Dibangun dengan **Laravel 10** dan **MySQL**.
 
 ## Akun Demo
 
-Kata sandi semua akun: `password`
-
-| Peran | Email |
-|---|---|
-| Admin | admin@sigap.test |
-| Petugas Lapangan | petugas1@sigap.test |
-| Warga | warga1@sigap.test |
+| Peran | Email | Kata sandi |
+|---|---|---|
+| Admin | admin.sigap@gmail.com | `AdminSigap#2026` |
+| Petugas Lapangan | slamet.riyadi@gmail.com, dewi.anggraini@gmail.com, bambang.hartono@gmail.com | `PetugasSigap#2026` |
+| Warga | siti.nurhaliza@gmail.com, agus.prasetyo@gmail.com, rina.wulandari@gmail.com, dimas.pratama@gmail.com, maya.kusuma@gmail.com, fajar.nugroho@gmail.com, lestari.putri@gmail.com, hendra.gunawan@gmail.com, ayu.permata@gmail.com | `WargaSigap#2026` |
 
 ## Catatan
 
