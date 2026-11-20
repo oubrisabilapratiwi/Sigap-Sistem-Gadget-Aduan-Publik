@@ -1,66 +1,100 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SIGAP (Sistem Gadget Aduan Publik)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi web pelaporan infrastruktur dan fasilitas umum berbasis wilayah. Warga dapat melaporkan masalah seperti jalan berlubang, lampu jalan mati, saluran air tersumbat, dan sampah liar. Laporan kemudian divalidasi admin dan ditindaklanjuti petugas lapangan.
 
-## About Laravel
+Dibangun dengan **Laravel 10** dan **MySQL**.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Fitur
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Warga**: membuat laporan dengan foto dan lokasi, memantau status laporan, dan memberi dukungan (upvote) pada laporan lain.
+- **Admin Pusat**: memvalidasi laporan, menyaring spam, dan menugaskan laporan ke petugas lapangan.
+- **Petugas Lapangan**: memperbarui status pengerjaan dan wajib mengunggah foto bukti saat laporan selesai.
+- **Alur status laporan**: Diajukan → Diverifikasi → Sedang Dikerjakan → Selesai.
+- **Role & Permission** memakai Spatie Laravel Permission.
+- **Kompresi foto** otomatis memakai Intervention Image.
+- Laporan dapat diurutkan berdasarkan jumlah dukungan terbanyak.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Teknologi
 
-## Learning Laravel
+| Komponen | Keterangan |
+|---|---|
+| Framework | Laravel 10 (PHP 8.1+) |
+| Database | MySQL |
+| Hak akses | spatie/laravel-permission |
+| Pengolah gambar | intervention/image |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Prasyarat
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- PHP 8.1 atau lebih baru, dengan ekstensi **gd** aktif
+- Composer
+- MySQL (misalnya lewat XAMPP atau Laragon)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Cara Menjalankan
 
-## Laravel Sponsors
+1. **Clone repository**
+   ```bash
+   git clone https://github.com/oubrisabilapratiwi/Sigap-Sistem-Gadget-Aduan-Publik.git
+   cd Sigap-Sistem-Gadget-Aduan-Publik
+   ```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+2. **Install dependensi**
+   ```bash
+   composer install
+   ```
 
-### Premium Partners
+3. **Siapkan file environment**
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+   Di Windows CMD, gunakan `copy .env.example .env`.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+4. **Buat database** bernama `sigap` (collation `utf8mb4_unicode_ci`) lewat phpMyAdmin atau MySQL, lalu sesuaikan `.env`:
+   ```env
+   APP_NAME=SIGAP
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=sigap
+   DB_USERNAME=root
+   DB_PASSWORD=
+   ```
 
-## Contributing
+5. **Jalankan migrasi dan data demo**
+   ```bash
+   php artisan migrate:fresh --seed
+   ```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+6. **Nyalakan server**
+   ```bash
+   php artisan serve
+   ```
+   Buka http://localhost:8000.
 
-## Code of Conduct
+## Akun Demo
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Kata sandi semua akun: `password`
 
-## Security Vulnerabilities
+| Peran | Email |
+|---|---|
+| Admin | admin@sigap.test |
+| Petugas Lapangan | petugas1@sigap.test |
+| Warga | warga1@sigap.test |
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Catatan
 
-## License
+- Foto yang diunggah saat membuat laporan ditampilkan lewat alamat `/media/...`, jadi **tidak perlu** menjalankan `php artisan storage:link`.
+- Foto contoh untuk data demo ada di `database/seeders/photos/`.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Mengatasi Error
+
+| Pesan error | Solusi |
+|---|---|
+| `Access denied` / `Unknown database` | Nama database, username, atau password di `.env` belum cocok |
+| `Class "Intervention\Image\..." not found` | Jalankan `composer install` |
+| `Class "Spatie\Permission\..." not found` | Jalankan `composer install` |
+| Ekstensi `gd` belum aktif | Di `php.ini`, hapus tanda `;` di depan `extension=gd`, lalu restart Apache |
+
+## Lisensi
+
+Dikembangkan untuk keperluan pembelajaran.
