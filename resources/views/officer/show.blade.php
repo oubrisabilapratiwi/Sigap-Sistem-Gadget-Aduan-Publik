@@ -16,7 +16,9 @@
     $status = $report->status->value;
     $proof = $report->proof_photo_url;
     $closed = $report->status->isFinal();
-    $defaultStatus = old('status', $status === 'verified' ? 'in_progress' : 'done');
+    $isCheck = $status === 'submitted'; // tahap cek lapangan: valid atau hoax
+    $defaultStatus = old('status', $isCheck ? 'verified' : ($status === 'verified' ? 'in_progress' : 'done'));
+    $rejectionPhoto = $report->rejection_photo_url;
 @endphp
 
 <div class="grid gap-6 xl:grid-cols-[1fr_420px]">
@@ -41,6 +43,7 @@
                 <div class="flex flex-wrap items-center gap-2.5">
                     <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold" style="background: {{ $cat->color }}1a; color: {{ $cat->color }}"><i data-lucide="{{ $cat->icon }}" class="h-3.5 w-3.5"></i>{{ $cat->name }}</span>
                     <x-status-badge :status="$report->status" />
+                    <x-priority-badge :report="$report" />
                     <span class="chip bg-slate-100 text-slate-700"><i data-lucide="arrow-big-up" class="h-3.5 w-3.5"></i>{{ $report->upvotes_count }} dukungan</span>
                 </div>
                 <h2 class="mt-4 text-2xl font-extrabold leading-snug tracking-tight text-ink">{{ $report->title }}</h2>
@@ -65,7 +68,19 @@
 
     {{-- ========== Form update ========== --}}
     <aside class="xl:sticky xl:top-24 xl:self-start">
-        @if ($closed)
+        @if ($closed && $status === 'rejected')
+            <div class="card border-rose-200 bg-rose-50 p-6 ring-rose-200">
+                <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500 text-white"><i data-lucide="x-circle" class="h-6 w-6"></i></span>
+                <h3 class="mt-4 font-extrabold text-rose-900">Laporan ditolak</h3>
+                <p class="mt-1 text-sm text-rose-800/90">{{ $report->rejection_reason }}</p>
+                @if ($rejectionPhoto)
+                    <button type="button" onclick="openLightbox('{{ $rejectionPhoto }}')" class="mt-4 block overflow-hidden rounded-xl ring-1 ring-rose-200">
+                        <img src="{{ $rejectionPhoto }}" alt="Foto bukti kondisi asli di lokasi" loading="lazy" class="aspect-[16/10] w-full cursor-zoom-in object-cover">
+                    </button>
+                    <p class="mt-1.5 text-xs text-rose-800/70">Foto bukti kondisi asli di lokasi.</p>
+                @endif
+            </div>
+        @elseif ($closed)
             <div class="card border-emerald-200 bg-emerald-50 p-6 ring-emerald-200">
                 <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-white"><i data-lucide="badge-check" class="h-6 w-6"></i></span>
                 <h3 class="mt-4 font-extrabold text-emerald-900">Tugas selesai</h3>
@@ -77,11 +92,31 @@
                   x-data="{ status: '{{ $defaultStatus }}', preview: null, name: '', sending: false }" @submit="sending = true">
                 @csrf
                 <div class="border-b border-slate-100 bg-slate-50 px-6 py-4">
-                    <h3 class="font-extrabold text-ink">Perbarui progres</h3>
+                    <h3 class="font-extrabold text-ink">{{ $isCheck ? 'Cek kebenaran laporan' : 'Perbarui progres' }}</h3>
                     <p class="mt-0.5 text-xs text-slate-500">Status saat ini: <b>{{ $report->status->label() }}</b></p>
                 </div>
 
                 <div class="space-y-5 p-6">
+                    @if ($isCheck)
+                    <div>
+                        <label class="label">Hasil pengecekan di lokasi</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="status" value="verified" x-model="status" class="peer sr-only">
+                                <span class="flex flex-col items-center gap-1.5 rounded-xl border-2 border-slate-200 p-4 text-center transition peer-checked:border-sky-500 peer-checked:bg-sky-50 hover:border-slate-300">
+                                    <i data-lucide="shield-check" class="h-6 w-6 text-sky-600"></i><span class="text-sm font-bold text-ink">Laporan benar</span>
+                                </span>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="status" value="rejected" x-model="status" class="peer sr-only">
+                                <span class="flex flex-col items-center gap-1.5 rounded-xl border-2 border-slate-200 p-4 text-center transition peer-checked:border-rose-500 peer-checked:bg-rose-50 hover:border-slate-300">
+                                    <i data-lucide="shield-x" class="h-6 w-6 text-rose-600"></i><span class="text-sm font-bold text-ink">Hoax / bohong</span>
+                                </span>
+                            </label>
+                        </div>
+                        @error('status') <p class="mt-1.5 text-sm text-rose-600">{{ $message }}</p> @enderror
+                    </div>
+                    @else
                     <div>
                         <label class="label">Status pengerjaan</label>
                         <div class="grid grid-cols-2 gap-3">
@@ -100,20 +135,25 @@
                         </div>
                         @error('status') <p class="mt-1.5 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
+                    @endif
 
                     <div>
-                        <label for="note" class="label">Catatan progres <span x-show="status === 'done'" class="font-normal text-slate-400">(opsional)</span></label>
-                        <textarea id="note" name="note" rows="3" maxlength="1000" class="input @error('note') !border-rose-400 @enderror" placeholder="Apa yang sudah dikerjakan?">{{ old('note') }}</textarea>
+                        <label for="note" class="label">
+                            <span x-text="status === 'rejected' ? 'Alasan penolakan / temuan di lapangan' : (status === 'verified' ? 'Catatan pengecekan' : 'Catatan progres')">Catatan progres</span>
+                            <span x-show="status === 'done' || status === 'verified'" class="font-normal text-slate-400">(opsional)</span>
+                        </label>
+                        <textarea id="note" name="note" rows="3" maxlength="1000" class="input @error('note') !border-rose-400 @enderror" x-bind:placeholder="status === 'rejected' ? 'Mis. lokasi tidak ditemukan kerusakan, foto pelapor bukan dari lokasi ini' : (status === 'verified' ? 'Mis. kerusakan sesuai laporan, perlu alat berat' : 'Apa yang sudah dikerjakan?')" placeholder="Apa yang sudah dikerjakan?">{{ old('note') }}</textarea>
                         @error('note') <p class="mt-1.5 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
-                    <div x-show="status === 'done'" x-cloak x-transition>
-                        <label class="label">Foto bukti perbaikan <span class="text-rose-600">*wajib</span></label>
-                        <label for="photo" class="relative flex min-h-[160px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 p-4 text-center transition hover:bg-emerald-50">
+                    <div x-show="status === 'done' || status === 'rejected'" x-cloak x-transition>
+                        <label class="label"><span x-text="status === 'rejected' ? 'Foto bukti kondisi asli di lokasi' : 'Foto bukti perbaikan'">Foto bukti perbaikan</span> <span class="text-rose-600">*wajib</span></label>
+                        <label for="photo" class="relative flex min-h-[160px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed bg-emerald-50/50 p-4 text-center transition hover:bg-emerald-50"
+                               :class="status === 'rejected' ? 'border-rose-300 !bg-rose-50/50 hover:!bg-rose-50' : 'border-emerald-300'">
                             <template x-if="preview"><img :src="preview" alt="" class="absolute inset-0 h-full w-full object-cover"></template>
                             <div x-show="!preview">
-                                <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm"><i data-lucide="camera" class="h-6 w-6"></i></span>
-                                <p class="mt-3 text-sm font-bold text-ink">Ambil foto hasil perbaikan</p>
+                                <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm" :class="status === 'rejected' && '!text-rose-600'"><i data-lucide="camera" class="h-6 w-6"></i></span>
+                                <p class="mt-3 text-sm font-bold text-ink" x-text="status === 'rejected' ? 'Ambil foto kondisi asli di lokasi' : 'Ambil foto hasil perbaikan'">Ambil foto hasil perbaikan</p>
                                 <p class="mt-0.5 text-xs text-slate-500">Otomatis dikompres · maks. 10 MB</p>
                             </div>
                             <div x-show="preview" x-cloak class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-left text-xs font-bold text-white"><span x-text="name"></span> · ketuk untuk mengganti</div>
@@ -123,8 +163,8 @@
                         @error('photo') <p class="mt-1.5 text-sm font-medium text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
-                    <button type="submit" :disabled="sending" class="btn-primary w-full py-3 text-base">
-                        <i data-lucide="save" class="h-5 w-5"></i> <span x-text="sending ? 'Menyimpan…' : (status === 'done' ? 'Tandai selesai' : 'Simpan progres')"></span>
+                    <button type="submit" :disabled="sending" :class="status === 'rejected' && '!bg-rose-600 hover:!bg-rose-700'" class="btn-primary w-full py-3 text-base">
+                        <i data-lucide="save" class="h-5 w-5"></i> <span x-text="sending ? 'Menyimpan…' : (status === 'done' ? 'Tandai selesai' : (status === 'verified' ? 'Verifikasi laporan' : (status === 'rejected' ? 'Tolak laporan' : 'Simpan progres')))"></span>
                     </button>
                 </div>
             </form>

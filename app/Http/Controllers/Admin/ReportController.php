@@ -51,85 +51,46 @@ class ReportController extends Controller
         ]);
     }
 
-    /** Validasi laporan valid + disposisi ke petugas lapangan. */
-    public function verify(Request $request, Report $report): RedirectResponse
+    /**
+     * Disposisi: admin hanya menugaskan petugas lapangan untuk mengecek laporan ke lokasi.
+     * Status tetap "Diajukan" — verifikasi / penolakan adalah kewenangan petugas.
+     */
+    public function dispose(Request $request, Report $report): RedirectResponse
     {
-        if ($report->status !== ReportStatus::Submitted) {
-            return back()->with('error', 'Hanya laporan berstatus "Diajukan" yang dapat diverifikasi.');
+        if ($report->status !== ReportStatus::Submitted || $report->assigned_to) {
+            return back()->with('error', 'Hanya laporan "Diajukan" yang belum ditugaskan yang dapat didisposisikan.');
         }
 
         $data = $request->validate([
             'assigned_to' => ['required', $this->officerRule()],
             'note' => ['nullable', 'string', 'max:500'],
-        ], ['assigned_to.required' => 'Pilih petugas lapangan yang akan menangani.']);
+        ], ['assigned_to.required' => 'Pilih petugas lapangan yang akan mengecek laporan.']);
 
         $officer = User::findOrFail($data['assigned_to']);
 
         DB::transaction(function () use ($report, $officer, $request, $data) {
-            $report->update([
-                'status' => ReportStatus::Verified,
-                'assigned_to' => $officer->id,
-                'verified_by' => $request->user()->id,
-                'verified_at' => now(),
-            ]);
+            $report->update(['assigned_to' => $officer->id]);
 
-            $note = "Laporan valid dan didisposisikan ke {$officer->name}.";
+            $note = "Laporan didisposisikan ke {$officer->name}" . ($officer->agency ? " ({$officer->agency->label()})" : '') . ' untuk dicek ke lokasi.';
             if (! empty($data['note'])) {
                 $note .= ' Catatan admin: ' . $data['note'];
             }
 
             $report->updates()->create([
                 'user_id' => $request->user()->id,
-                'status' => ReportStatus::Verified,
+                'status' => ReportStatus::Submitted,
                 'note' => $note,
             ]);
         });
 
         return redirect()->route('admin.reports.show', $report)
-            ->with('success', "Laporan diverifikasi dan ditugaskan ke {$officer->name}.");
-    }
-
-    /** Tolak laporan (spam / palsu / duplikat). */
-    public function reject(Request $request, Report $report): RedirectResponse
-    {
-        if ($report->status !== ReportStatus::Submitted) {
-            return back()->with('error', 'Hanya laporan berstatus "Diajukan" yang dapat ditolak.');
-        }
-
-        $data = $request->validate([
-            'rejection_reason' => ['required', 'string', 'min:10', 'max:500'],
-            'block_user' => ['nullable', 'boolean'],
-        ], [
-            'rejection_reason.required' => 'Tuliskan alasan penolakan.',
-            'rejection_reason.min' => 'Alasan penolakan minimal 10 karakter.',
-        ]);
-
-        DB::transaction(function () use ($report, $request, $data) {
-            $report->update([
-                'status' => ReportStatus::Rejected,
-                'rejection_reason' => $data['rejection_reason'],
-                'verified_by' => $request->user()->id,
-            ]);
-
-            $report->updates()->create([
-                'user_id' => $request->user()->id,
-                'status' => ReportStatus::Rejected,
-                'note' => 'Laporan ditolak: ' . $data['rejection_reason'],
-            ]);
-
-            if ($request->boolean('block_user')) {
-                $report->user()->update(['is_active' => false]);
-            }
-        });
-
-        return redirect()->route('admin.reports.index', ['status' => 'submitted'])
-            ->with('success', 'Laporan ditolak dan disembunyikan dari publik.');
+            ->with('success', "Laporan ditugaskan ke {$officer->name} untuk dicek ke lokasi.");
     }
 
     /** Pindahkan tugas ke petugas lain. */
     public function reassign(Request $request, Report $report): RedirectResponse
     {
-        if (! in_array($report->status, [ReportStatus::Verified, ReportStatus::InProgress], true)) {
+        if (! in_array($report->status, [ReportStatus::Submitted, ReportStatus::Verified, ReportStatus::InProgress], true) || ! $report->assigned_to) {
             return back()->with('error', 'Tugas hanya dapat dialihkan selama laporan belum selesai.');
         }
 
@@ -149,7 +110,7 @@ class ReportController extends Controller
             $report->updates()->create([
                 'user_id' => $request->user()->id,
                 'status' => $report->status,
-                'note' => "Tugas dialihkan ke {$officer->name}.",
+                'note' => "Tugas dialihkan ke {$officer->name}" . ($officer->agency ? " ({$officer->agency->label()})" : '') . '.',
             ]);
         });
 
@@ -162,7 +123,8 @@ class ReportController extends Controller
         return User::role(User::ROLE_OFFICER)
             ->where('is_active', true)
             ->with('region')
-            ->withCount(['assignedReports as active_count' => fn ($q) => $q->whereIn('status', [ReportStatus::Verified->value, ReportStatus::InProgress->value])])
+            ->withCount(['assignedReports as active_count' => fn ($q) => $q->whereIn('status', ReportStatus::activeValues())])
+            ->when($report->category?->agency, fn ($q, $agency) => $q->orderByRaw('agency = ? desc', [$agency->value]))
             ->orderByRaw('region_id = ? desc', [$report->region_id])
             ->orderBy('active_count')
             ->get();

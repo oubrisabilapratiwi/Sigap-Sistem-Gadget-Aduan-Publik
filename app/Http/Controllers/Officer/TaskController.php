@@ -22,11 +22,13 @@ class TaskController extends Controller
 
         $query = Report::query()->assignedTo($user)->with(['category', 'region']);
 
+        // Riwayat = laporan yang sudah ditutup (selesai atau ditolak setelah dicek petugas)
         $tab === 'selesai'
-            ? $query->status(ReportStatus::Done)->latest('completed_at')
-            : $query->whereIn('status', [ReportStatus::Verified->value, ReportStatus::InProgress->value])->mostUpvoted();
+            ? $query->whereIn('status', [ReportStatus::Done->value, ReportStatus::Rejected->value])->latest('updated_at')
+            : $query->whereIn('status', ReportStatus::activeValues())->mostUpvoted();
 
         $stats = [
+            'submitted' => $user->assignedReports()->where('status', ReportStatus::Submitted->value)->count(),
             'verified' => $user->assignedReports()->where('status', ReportStatus::Verified->value)->count(),
             'in_progress' => $user->assignedReports()->where('status', ReportStatus::InProgress->value)->count(),
             'done' => $user->assignedReports()->where('status', ReportStatus::Done->value)->count(),
@@ -48,7 +50,12 @@ class TaskController extends Controller
         return view('officer.show', compact('report'));
     }
 
-    /** Ubah status pengerjaan. Status "Selesai" WAJIB menyertakan foto bukti. */
+    /**
+     * Petugas menindaklanjuti laporan yang didisposisikan admin.
+     *
+     *  - Diajukan  : cek lapangan -> "Diverifikasi" (valid) atau "Ditolak" (hoax, WAJIB foto bukti asli di lokasi).
+     *  - Diverifikasi / Sedang Dikerjakan : lanjut ke "Sedang Dikerjakan" atau "Selesai" (WAJIB foto bukti perbaikan).
+     */
     public function update(Request $request, Report $report, ImageService $images): RedirectResponse
     {
         abort_unless($report->assigned_to === $request->user()->id, 403);
@@ -57,31 +64,55 @@ class TaskController extends Controller
             return back()->with('error', 'Laporan ini sudah ditutup dan tidak dapat diubah lagi.');
         }
 
-        $isDone = $request->input('status') === ReportStatus::Done->value;
+        $allowed = $report->status === ReportStatus::Submitted
+            ? [ReportStatus::Verified->value, ReportStatus::Rejected->value]
+            : [ReportStatus::InProgress->value, ReportStatus::Done->value];
+
+        $input = $request->input('status');
+        $isDone = $input === ReportStatus::Done->value;
+        $isReject = $input === ReportStatus::Rejected->value;
+        $isVerify = $input === ReportStatus::Verified->value;
 
         $data = $request->validate([
-            'status' => ['required', Rule::in([ReportStatus::InProgress->value, ReportStatus::Done->value])],
-            'note' => [Rule::requiredIf(! $isDone), 'nullable', 'string', 'min:5', 'max:1000'],
-            'photo' => [Rule::requiredIf($isDone), 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+            'status' => ['required', Rule::in($allowed)],
+            'note' => [Rule::requiredIf(! $isDone && ! $isVerify), 'nullable', 'string', 'min:' . ($isReject ? 10 : 5), 'max:1000'],
+            'photo' => [Rule::requiredIf($isDone || $isReject), 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
         ], [
-            'note.required' => 'Tuliskan catatan progres pengerjaan.',
-            'note.min' => 'Catatan minimal 5 karakter.',
-            'photo.required' => 'Foto bukti perbaikan wajib diunggah untuk menandai laporan selesai.',
+            'status.in' => 'Status tidak valid untuk tahap laporan saat ini.',
+            'note.required' => $isReject ? 'Jelaskan temuan di lapangan yang menunjukkan laporan tidak sesuai fakta.' : 'Tuliskan catatan progres pengerjaan.',
+            'note.min' => $isReject ? 'Alasan penolakan minimal 10 karakter.' : 'Catatan minimal 5 karakter.',
+            'photo.required' => $isReject
+                ? 'Foto bukti kondisi asli di lokasi wajib diunggah untuk menolak laporan.'
+                : 'Foto bukti perbaikan wajib diunggah untuk menandai laporan selesai.',
         ]);
 
         $path = $request->hasFile('photo') ? $images->store($request->file('photo'), 'proofs') : null;
 
         try {
-            DB::transaction(function () use ($report, $request, $data, $path, $isDone) {
-                $report->update([
-                    'status' => $data['status'],
-                    'completed_at' => $isDone ? now() : null,
-                ]);
+            DB::transaction(function () use ($report, $request, $data, $path, $isDone, $isReject, $isVerify) {
+                $changes = ['status' => $data['status']];
+
+                if ($isVerify) {
+                    $changes += ['verified_by' => $request->user()->id, 'verified_at' => now()];
+                } elseif ($isReject) {
+                    $changes += ['verified_by' => $request->user()->id, 'rejection_reason' => $data['note']];
+                } else {
+                    $changes['completed_at'] = $isDone ? now() : null;
+                }
+
+                $report->update($changes);
+
+                $note = match (true) {
+                    $isReject => 'Laporan ditolak setelah dicek di lokasi: ' . $data['note'],
+                    $isVerify => 'Laporan terbukti valid setelah dicek di lokasi.' . (! empty($data['note']) ? ' Catatan petugas: ' . $data['note'] : ''),
+                    $isDone => $data['note'] ?? 'Perbaikan selesai dikerjakan.',
+                    default => $data['note'] ?? null,
+                };
 
                 $report->updates()->create([
                     'user_id' => $request->user()->id,
                     'status' => $data['status'],
-                    'note' => $data['note'] ?? ($isDone ? 'Perbaikan selesai dikerjakan.' : null),
+                    'note' => $note,
                     'photo' => $path,
                 ]);
             });
@@ -90,7 +121,13 @@ class TaskController extends Controller
             throw $e;
         }
 
-        return redirect()->route('officer.tasks.show', $report)
-            ->with('success', $isDone ? 'Laporan ditandai selesai. Terima kasih atas kerja kerasnya!' : 'Progres pengerjaan diperbarui.');
+        $message = match (true) {
+            $isReject => 'Laporan ditolak dan foto bukti tersimpan. Pelapor dapat melihat alasan penolakan.',
+            $isVerify => 'Laporan diverifikasi. Silakan lanjutkan penanganan hingga selesai.',
+            $isDone => 'Laporan ditandai selesai. Terima kasih atas kerja kerasnya!',
+            default => 'Progres pengerjaan diperbarui.',
+        };
+
+        return redirect()->route('officer.tasks.show', $report)->with('success', $message);
     }
 }

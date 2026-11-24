@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Agency;
 use App\Enums\ReportStatus;
 use App\Models\Category;
 use App\Models\Region;
@@ -49,13 +50,14 @@ class DemoDataSeeder extends Seeder
         $admin->syncRoles('admin');
 
         $officers = collect([
-            ['Slamet Riyadi', 'slamet.riyadi@gmail.com', 'Menteng'],
-            ['Dewi Anggraini', 'dewi.anggraini@gmail.com', 'Tebet'],
-            ['Bambang Hartono', 'bambang.hartono@gmail.com', 'Kebon Jeruk'],
-        ])->map(function ($o, $i) use ($passwordPetugas, $regions) {
+            // [nama, email, wilayah, instansi, no. HP]
+            ['Slamet Riyadi', 'slamet.riyadi@gmail.com', 'Menteng', Agency::BinaMarga, '081200000101'],
+            ['Dewi Anggraini', 'dewi.anggraini@gmail.com', 'Tebet', Agency::LingkunganHidup, '081200000102'],
+            ['Bambang Hartono', 'bambang.hartono@gmail.com', 'Kebon Jeruk', Agency::Pln, '081200000103'],
+        ])->map(function ($o) use ($passwordPetugas, $regions) {
             $user = User::updateOrCreate(['email' => $o[1]], [
                 'name' => $o[0], 'password' => $passwordPetugas,
-                'phone' => '08120000010' . ($i + 1), 'region_id' => $regions[$o[2]], 'is_active' => true,
+                'phone' => $o[4], 'region_id' => $regions[$o[2]], 'agency' => $o[3], 'is_active' => true,
             ]);
             $user->syncRoles('petugas');
 
@@ -86,6 +88,9 @@ class DemoDataSeeder extends Seeder
         // created_at/updated_at diisi manual agar riwayat demo terlihat realistis
         Model::unguard();
 
+        // Format tiap baris:
+        // [kategori, judul, alamat, wilayah, lat, lng, status, JUMLAH DUKUNGAN, umur laporan (hari lalu)]
+        // Jumlah dukungan ditulis apa adanya ke kolom upvotes_count (>= 10 = "Prioritas").
         $samples = [
             ['jalan-rusak', 'Lubang besar di depan SDN 03 membahayakan pengendara', 'Jl. Melati Raya No. 12, depan SDN 03', 'Menteng', -6.1953, 106.8312, 'in_progress', 9, 6],
             ['lampu-jalan', 'Lampu penerangan jalan mati sepanjang 300 meter', 'Jl. Kenanga Timur, dekat Pos Ronda RW 05', 'Tebet', -6.2261, 106.8537, 'verified', 8, 4],
@@ -101,7 +106,7 @@ class DemoDataSeeder extends Seeder
             ['fasilitas-umum', 'Halte bus atap bocor, penumpang kehujanan', 'Halte Kebon Jeruk Raya', 'Kebon Jeruk', -6.1883, 106.7745, 'verified', 4, 2],
         ];
 
-        foreach ($samples as $i => [$cat, $title, $address, $region, $lat, $lng, $status, $voteTarget, $daysAgo]) {
+        foreach ($samples as $i => [$cat, $title, $address, $region, $lat, $lng, $status, $upvotes, $daysAgo]) {
             $owner = $citizens[$i % $citizens->count()];
             $createdAt = now()->subDays($daysAgo)->subHours(rand(1, 10));
             $officer = $officers->firstWhere('region_id', $regions[$region]) ?? $officers->random();
@@ -122,14 +127,15 @@ class DemoDataSeeder extends Seeder
                 'updated_at' => $createdAt,
             ]);
 
-            $this->log($report, $owner, ReportStatus::Submitted, 'Laporan diajukan oleh warga dan menunggu verifikasi admin.', $createdAt);
+            $this->log($report, $owner, ReportStatus::Submitted, 'Laporan diajukan oleh warga dan menunggu disposisi admin.', $createdAt);
 
             if ($status === 'rejected') {
+                $this->log($report, $admin, ReportStatus::Submitted, "Laporan didisposisikan ke {$officer->name} ({$officer->agency->label()}) untuk dicek ke lokasi.", $createdAt->copy()->addHours(2));
                 $report->update([
-                    'status' => ReportStatus::Rejected, 'verified_by' => $admin->id,
+                    'status' => ReportStatus::Rejected, 'assigned_to' => $officer->id, 'verified_by' => $officer->id,
                     'rejection_reason' => 'Foto dan lokasi tidak sesuai dengan deskripsi (terindikasi laporan duplikat).',
                 ]);
-                $this->log($report, $admin, ReportStatus::Rejected, 'Ditolak: foto dan lokasi tidak sesuai dengan deskripsi.', $createdAt->copy()->addHours(5));
+                $this->log($report, $officer, ReportStatus::Rejected, 'Laporan ditolak setelah dicek di lokasi: foto dan lokasi tidak sesuai dengan deskripsi.', $createdAt->copy()->addHours(5));
                 continue;
             }
 
@@ -137,9 +143,10 @@ class DemoDataSeeder extends Seeder
                 $at = $createdAt->copy()->addHours(6);
                 $report->update([
                     'status' => ReportStatus::Verified, 'assigned_to' => $officer->id,
-                    'verified_by' => $admin->id, 'verified_at' => $at,
+                    'verified_by' => $officer->id, 'verified_at' => $at,
                 ]);
-                $this->log($report, $admin, ReportStatus::Verified, "Laporan valid dan didisposisikan ke {$officer->name}.", $at);
+                $this->log($report, $admin, ReportStatus::Submitted, "Laporan didisposisikan ke {$officer->name} ({$officer->agency->label()}) untuk dicek ke lokasi.", $createdAt->copy()->addHours(2));
+                $this->log($report, $officer, ReportStatus::Verified, 'Laporan terbukti valid setelah dicek di lokasi.', $at);
             }
 
             if (in_array($status, ['in_progress', 'done'], true)) {
@@ -154,12 +161,8 @@ class DemoDataSeeder extends Seeder
                 $this->log($report, $officer, ReportStatus::Done, 'Perbaikan selesai dikerjakan. Mohon dikonfirmasi bila masih ada kendala.', $at);
             }
 
-            // Dukungan warga (tidak boleh dari pelapor sendiri)
-            $voters = $citizens->where('id', '!=', $owner->id)->shuffle()->take($voteTarget);
-            foreach ($voters as $voter) {
-                $report->votes()->create(['user_id' => $voter->id]);
-            }
-            $report->update(['upvotes_count' => $report->votes()->count()]);
+            // Jumlah dukungan sesuai angka yang Anda tulis di $samples
+            $report->update(['upvotes_count' => $upvotes]);
         }
 
         Model::reguard();

@@ -24,11 +24,11 @@ enum ReportStatus: string
     public function description(): string
     {
         return match ($this) {
-            self::Submitted => 'Laporan masuk dan menunggu validasi admin.',
-            self::Verified => 'Laporan valid dan sudah didisposisikan ke petugas.',
+            self::Submitted => 'Laporan masuk, didisposisikan admin ke petugas untuk dicek di lokasi.',
+            self::Verified => 'Petugas sudah mengecek di lokasi dan laporan terbukti valid.',
             self::InProgress => 'Petugas sedang menangani di lapangan.',
             self::Done => 'Perbaikan selesai dan sudah ada foto bukti.',
-            self::Rejected => 'Laporan tidak memenuhi syarat atau terindikasi spam.',
+            self::Rejected => 'Hasil pengecekan petugas: laporan tidak sesuai fakta di lokasi.',
         };
     }
 

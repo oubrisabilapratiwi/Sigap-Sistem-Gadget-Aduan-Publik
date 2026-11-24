@@ -2,12 +2,17 @@
 
 namespace App\Models;
 
+use App\Enums\Agency;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Category extends Model
 {
-    protected $fillable = ['name', 'slug', 'icon', 'color'];
+    protected $fillable = ['name', 'slug', 'icon', 'color', 'agency'];
+
+    protected $casts = [
+        'agency' => Agency::class,
+    ];
 
     public function reports(): HasMany
     {

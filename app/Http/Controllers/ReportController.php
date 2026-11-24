@@ -161,12 +161,12 @@ class ReportController extends Controller
         return view('reports.mine', compact('reports', 'counts'));
     }
 
-    /** Pelapor boleh menghapus laporannya selama belum diverifikasi. */
+    /** Pelapor boleh menghapus laporannya selama belum didisposisikan / diverifikasi. */
     public function destroy(Request $request, Report $report, ImageService $images): RedirectResponse
     {
         abort_unless($report->user_id === $request->user()->id, 403);
 
-        if ($report->status !== ReportStatus::Submitted) {
+        if ($report->status !== ReportStatus::Submitted || $report->assigned_to) {
             return back()->with('error', 'Laporan yang sudah diproses tidak dapat dihapus.');
         }
 

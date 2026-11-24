@@ -41,6 +41,7 @@
                 <div class="flex flex-wrap items-center gap-2.5">
                     <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold" style="background: {{ $cat->color }}1a; color: {{ $cat->color }}"><i data-lucide="{{ $cat->icon }}" class="h-3.5 w-3.5"></i>{{ $cat->name }}</span>
                     <x-status-badge :status="$report->status" />
+                    <x-priority-badge :report="$report" />
                     <span class="chip bg-slate-100 text-slate-700"><i data-lucide="arrow-big-up" class="h-3.5 w-3.5"></i>{{ $report->upvotes_count }} dukungan</span>
                 </div>
                 <h2 class="mt-4 text-2xl font-extrabold leading-snug tracking-tight text-ink">{{ $report->title }}</h2>
@@ -50,6 +51,7 @@
                     <div><dt class="text-slate-400">Pelapor</dt><dd class="mt-0.5 font-bold text-ink">{{ $report->user->name }}</dd><dd class="text-xs text-slate-500">{{ $report->user->email }}{{ $report->user->phone ? ' · ' . $report->user->phone : '' }}</dd></div>
                     <div><dt class="text-slate-400">Dikirim</dt><dd class="mt-0.5 font-bold text-ink">{{ $report->created_at->translatedFormat('d F Y, H:i') }}</dd></div>
                     <div><dt class="text-slate-400">Wilayah</dt><dd class="mt-0.5 font-bold text-ink">{{ $report->region->name }}</dd></div>
+                    <div><dt class="text-slate-400">Instansi penanganan</dt><dd class="mt-0.5 font-bold text-ink">{{ $cat->agency?->label() ?? 'Ditentukan admin' }}</dd></div>
                     <div><dt class="text-slate-400">Alamat</dt><dd class="mt-0.5 font-bold text-ink">{{ $report->address }}</dd></div>
                 </dl>
             </div>
@@ -72,17 +74,23 @@
     {{-- ========== Aksi ========== --}}
     <aside class="space-y-6 xl:sticky xl:top-24 xl:self-start">
 
-        @if ($status === 'submitted')
-            {{-- Verifikasi & disposisi --}}
-            <form method="POST" action="{{ route('admin.reports.verify', $report) }}" class="card overflow-hidden">
+        @if ($status === 'submitted' && ! $report->assigned_to)
+            {{-- Disposisi: admin hanya menugaskan petugas untuk mengecek ke lokasi --}}
+            <form method="POST" action="{{ route('admin.reports.dispose', $report) }}" class="card overflow-hidden">
                 @csrf
                 <div class="border-b border-emerald-100 bg-emerald-50 px-6 py-4">
-                    <h3 class="flex items-center gap-2 font-extrabold text-emerald-900"><i data-lucide="shield-check" class="h-5 w-5"></i> Verifikasi &amp; disposisi</h3>
-                    <p class="mt-0.5 text-xs text-emerald-800/80">Laporan valid? Tugaskan ke petugas lapangan.</p>
+                    <h3 class="flex items-center gap-2 font-extrabold text-emerald-900"><i data-lucide="send" class="h-5 w-5"></i> Disposisi petugas</h3>
+                    <p class="mt-0.5 text-xs text-emerald-800/80">Tugaskan petugas lapangan untuk mengecek kebenaran laporan di lokasi. Petugas yang memutuskan laporan valid atau hoax.</p>
                 </div>
                 <div class="space-y-4 p-6">
                     <div>
                         <label class="label">Pilih petugas</label>
+                        @if ($cat->agency)
+                            <p class="-mt-1 mb-2 text-xs text-slate-500">Kategori ini ditangani <b class="text-ink">{{ $cat->agency->label() }}</b>. Petugas instansi tersebut ditampilkan paling atas.</p>
+                            @unless ($officers->contains(fn ($x) => $x->agency === $cat->agency))
+                                <p class="mb-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">Belum ada petugas aktif dari {{ $cat->agency->label() }}. <a href="{{ route('admin.officers.index') }}" class="font-bold underline">Atur instansi petugas</a></p>
+                            @endunless
+                        @endif
                         <div class="space-y-2">
                             @forelse ($officers as $o)
                                 <label class="cursor-pointer">
@@ -91,9 +99,12 @@
                                         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink text-xs font-bold text-white">{{ $o->initials }}</span>
                                         <span class="min-w-0 flex-1 leading-tight">
                                             <span class="block truncate text-sm font-bold text-ink">{{ $o->name }}</span>
+                                            @if ($o->agency_label)<span class="block truncate text-xs font-semibold text-brand-700">{{ $o->agency_label }}</span>@endif
                                             <span class="block text-xs text-slate-500">{{ $o->region?->name ?? '—' }} · {{ $o->active_count }} tugas aktif</span>
                                         </span>
-                                        @if ($o->region_id === $report->region_id)
+                                        @if ($cat->agency && $o->agency === $cat->agency)
+                                            <span class="chip bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200">Sesuai kategori</span>
+                                        @elseif ($o->region_id === $report->region_id)
                                             <span class="chip bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200">Satu wilayah</span>
                                         @endif
                                     </span>
@@ -106,47 +117,26 @@
                     </div>
                     <div>
                         <label for="note" class="label">Catatan untuk petugas <span class="font-normal text-slate-400">(opsional)</span></label>
-                        <textarea id="note" name="note" rows="2" maxlength="500" class="input" placeholder="Mis. bawa alat penambal aspal">{{ old('note') }}</textarea>
+                        <textarea id="note" name="note" rows="2" maxlength="500" class="input" placeholder="Mis. cek kesesuaian foto dengan kondisi di lokasi">{{ old('note') }}</textarea>
                     </div>
-                    <button class="btn-primary w-full" @disabled($officers->isEmpty())><i data-lucide="send" class="h-4 w-4"></i> Verifikasi &amp; tugaskan</button>
+                    <button class="btn-primary w-full" @disabled($officers->isEmpty())><i data-lucide="send" class="h-4 w-4"></i> Tugaskan petugas</button>
                 </div>
             </form>
 
-            {{-- Tolak --}}
-            <form method="POST" action="{{ route('admin.reports.reject', $report) }}" class="card overflow-hidden" x-data="{ open: {{ $errors->has('rejection_reason') ? 'true' : 'false' }} }"
-                  data-confirm="Laporan akan disembunyikan dari publik. Pelapor tetap dapat melihat alasan penolakan di halaman laporannya."
-                  data-confirm-title="Tolak laporan ini?" data-confirm-ok="Ya, tolak laporan" data-confirm-tone="danger"
-                  data-confirm-icon="reject" data-confirm-detail-from="#rejection_reason">
-                @csrf
-                <button type="button" @click="open = !open" class="flex w-full items-center justify-between px-6 py-4 text-left">
-                    <span class="flex items-center gap-2 font-extrabold text-rose-700"><i data-lucide="shield-x" class="h-5 w-5"></i> Tolak / tandai spam</span>
-                    <i data-lucide="chevron-down" class="h-4 w-4 text-slate-400 transition" :class="open && 'rotate-180'"></i>
-                </button>
-                <div x-show="open" x-cloak x-transition class="space-y-4 border-t border-slate-100 p-6">
-                    <div>
-                        <label for="rejection_reason" class="label">Alasan penolakan</label>
-                        <textarea id="rejection_reason" name="rejection_reason" rows="3" minlength="10" maxlength="500" required class="input @error('rejection_reason') !border-rose-400 @enderror" placeholder="Mis. foto tidak sesuai lokasi / laporan duplikat / terindikasi spam">{{ old('rejection_reason') }}</textarea>
-                        @error('rejection_reason') <p class="mt-1.5 text-sm text-rose-600">{{ $message }}</p> @enderror
-                    </div>
-                    <label class="flex items-start gap-2.5 text-sm text-slate-600">
-                        <input type="checkbox" name="block_user" value="1" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500">
-                        <span>Nonaktifkan akun pelapor <span class="text-slate-400">(untuk spam berulang)</span></span>
-                    </label>
-                    <button class="btn-danger w-full"><i data-lucide="x-circle" class="h-4 w-4"></i> Tolak laporan</button>
-                </div>
-            </form>
-
-        @elseif (in_array($status, ['verified', 'in_progress']))
+        @elseif (in_array($status, ['submitted', 'verified', 'in_progress']))
             <div class="card p-6">
                 <h3 class="text-sm font-extrabold uppercase tracking-wider text-slate-400">Petugas penanggung jawab</h3>
                 <div class="mt-4 flex items-center gap-3">
                     <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-ink font-bold text-white">{{ $report->assignee?->initials ?? '?' }}</span>
                     <div class="leading-tight">
                         <p class="font-extrabold text-ink">{{ $report->assignee?->name ?? 'Belum ditugaskan' }}</p>
+                        @if ($report->assignee?->agency_label)<p class="text-sm font-semibold text-brand-700">{{ $report->assignee->agency_label }}</p>@endif
                         <p class="text-sm text-slate-500">{{ $report->assignee?->phone ?? $report->assignee?->email }}</p>
                     </div>
                 </div>
-                @if ($report->verifier)
+                @if ($status === 'submitted')
+                    <p class="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">Menunggu petugas mengecek laporan di lokasi (valid atau hoax).</p>
+                @elseif ($report->verifier)
                     <p class="mt-4 text-xs text-slate-400">Diverifikasi oleh {{ $report->verifier->name }} · {{ optional($report->verified_at)->translatedFormat('d M Y, H:i') }}</p>
                 @endif
             </div>
@@ -158,7 +148,7 @@
                 <select name="assigned_to" class="input mt-4" required>
                     <option value="">Pilih petugas…</option>
                     @foreach ($officers as $o)
-                        <option value="{{ $o->id }}" @disabled($o->id === $report->assigned_to)>{{ $o->name }} — {{ $o->region?->name ?? '—' }} ({{ $o->active_count }} aktif){{ $o->id === $report->assigned_to ? ' • saat ini' : '' }}</option>
+                        <option value="{{ $o->id }}" @disabled($o->id === $report->assigned_to)>{{ $o->name }}{{ $o->agency_label ? ' (' . $o->agency_label . ')' : '' }} — {{ $o->region?->name ?? '—' }} ({{ $o->active_count }} aktif){{ $o->id === $report->assigned_to ? ' • saat ini' : '' }}</option>
                     @endforeach
                 </select>
                 @error('assigned_to') <p class="mt-1.5 text-sm text-rose-600">{{ $message }}</p> @enderror
@@ -169,7 +159,7 @@
             <div class="card border-emerald-200 bg-emerald-50 p-6 ring-emerald-200">
                 <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-white"><i data-lucide="badge-check" class="h-6 w-6"></i></span>
                 <h3 class="mt-4 font-extrabold text-emerald-900">Laporan selesai</h3>
-                <p class="mt-1 text-sm text-emerald-800/80">Dikerjakan oleh {{ $report->assignee?->name ?? '—' }} dan sudah disertai foto bukti.</p>
+                <p class="mt-1 text-sm text-emerald-800/80">Dikerjakan oleh {{ $report->assignee?->name ?? '—' }}{{ $report->assignee?->agency_label ? ' (' . $report->assignee->agency_label . ')' : '' }} dan sudah disertai foto bukti.</p>
                 @if ($report->completed_at)<p class="mt-3 text-xs text-emerald-800/70">Selesai {{ $report->completed_at->translatedFormat('d F Y, H:i') }}</p>@endif
             </div>
 
@@ -178,7 +168,13 @@
                 <span class="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500 text-white"><i data-lucide="x-circle" class="h-6 w-6"></i></span>
                 <h3 class="mt-4 font-extrabold text-rose-900">Laporan ditolak</h3>
                 <p class="mt-1 text-sm text-rose-800/90">{{ $report->rejection_reason }}</p>
-                @if ($report->verifier)<p class="mt-3 text-xs text-rose-800/70">Oleh {{ $report->verifier->name }}</p>@endif
+                @if ($report->rejection_photo_url)
+                    <button type="button" onclick="openLightbox('{{ $report->rejection_photo_url }}')" class="mt-4 block overflow-hidden rounded-xl ring-1 ring-rose-200">
+                        <img src="{{ $report->rejection_photo_url }}" alt="Foto bukti kondisi asli di lokasi" loading="lazy" class="aspect-[16/10] w-full cursor-zoom-in object-cover">
+                    </button>
+                    <p class="mt-1.5 text-xs text-rose-800/70">Foto bukti kondisi asli di lokasi dari petugas.</p>
+                @endif
+                @if ($report->verifier)<p class="mt-3 text-xs text-rose-800/70">Ditolak oleh petugas {{ $report->verifier->name }}{{ $report->verifier->agency_label ? ' (' . $report->verifier->agency_label . ')' : '' }}</p>@endif
             </div>
         @endif
 

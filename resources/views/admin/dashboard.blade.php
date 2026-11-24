@@ -6,7 +6,7 @@
 
 @section('actions')
     <a href="{{ route('admin.reports.index', ['status' => 'submitted']) }}" class="btn-primary hidden sm:inline-flex">
-        <i data-lucide="inbox" class="h-4 w-4"></i> Validasi laporan
+        <i data-lucide="inbox" class="h-4 w-4"></i> Disposisi laporan
         @if ($counts['submitted'])<span class="rounded-full bg-white/20 px-2 text-xs">{{ $counts['submitted'] }}</span>@endif
     </a>
 @endsection
@@ -14,7 +14,7 @@
 @section('content')
 @php
     $cards = [
-        ['submitted', 'Menunggu validasi', 'send', 'from-amber-400 to-orange-500'],
+        ['submitted', 'Diajukan', 'send', 'from-amber-400 to-orange-500'],
         ['verified', 'Diverifikasi', 'shield-check', 'from-sky-400 to-sky-600'],
         ['in_progress', 'Sedang dikerjakan', 'hammer', 'from-brand-400 to-brand-700'],
         ['done', 'Selesai', 'badge-check', 'from-emerald-400 to-emerald-600'],
@@ -58,7 +58,7 @@
     <section class="card overflow-hidden">
         <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
             <div>
-                <h2 class="font-extrabold text-ink">Antrean validasi</h2>
+                <h2 class="font-extrabold text-ink">Antrean disposisi</h2>
                 <p class="text-sm text-slate-500">Diurutkan dari dukungan warga terbanyak</p>
             </div>
             <a href="{{ route('admin.reports.index', ['status' => 'submitted']) }}" class="text-sm font-bold text-brand-700 hover:underline">Lihat semua</a>
@@ -77,7 +77,7 @@
         @empty
             <div class="flex flex-col items-center px-6 py-16 text-center">
                 <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"><i data-lucide="check-check" class="h-7 w-7"></i></span>
-                <p class="mt-4 font-extrabold text-ink">Semua laporan sudah divalidasi</p>
+                <p class="mt-4 font-extrabold text-ink">Semua laporan sudah didisposisikan</p>
                 <p class="mt-1 text-sm text-slate-500">Tidak ada antrean saat ini.</p>
             </div>
         @endforelse

@@ -2,7 +2,7 @@
 
 @section('title', 'Laporan Masuk — SIGAP')
 @section('heading', 'Laporan Masuk')
-@section('subheading', 'Validasi, saring spam, dan disposisikan ke petugas')
+@section('subheading', 'Disposisikan laporan ke petugas lapangan untuk dicek di lokasi')
 
 @section('content')
 @php
@@ -58,13 +58,13 @@
         </div>
     @else
         <div class="overflow-x-auto">
-            <table class="w-full min-w-[860px] text-left text-sm">
+            <table class="w-full min-w-[1000px] text-left text-sm">
                 <thead class="border-b border-slate-100 bg-slate-50/70 text-xs font-bold uppercase tracking-wider text-slate-500">
                     <tr>
                         <th class="px-6 py-3.5">Laporan</th>
                         <th class="px-4 py-3.5">Wilayah</th>
                         <th class="px-4 py-3.5 text-center">Dukungan</th>
-                        <th class="px-4 py-3.5">Status</th>
+                        <th class="whitespace-nowrap px-4 py-3.5">Status</th>
                         <th class="px-4 py-3.5">Petugas</th>
                         <th class="px-6 py-3.5 text-right">Aksi</th>
                     </tr>
@@ -87,13 +87,21 @@
                                     </span>
                                 </a>
                             </td>
-                            <td class="px-4 py-4 text-slate-600">{{ $report->region->name }}</td>
+                            <td class="whitespace-nowrap px-4 py-4 text-slate-600">{{ $report->region->name }}</td>
                             <td class="px-4 py-4 text-center"><span class="inline-flex items-center gap-1 font-extrabold text-ink"><i data-lucide="arrow-big-up" class="h-4 w-4 text-brand-600"></i>{{ $report->upvotes_count }}</span></td>
-                            <td class="px-4 py-4"><x-status-badge :status="$report->status" /></td>
-                            <td class="px-4 py-4 text-slate-600">{{ $report->assignee?->name ?? '—' }}</td>
+                            <td class="whitespace-nowrap px-4 py-4">
+                                <div class="flex flex-col items-start gap-1.5">
+                                    <x-status-badge :status="$report->status" />
+                                    <x-priority-badge :report="$report" />
+                                </div>
+                            </td>
+                            <td class="whitespace-nowrap px-4 py-4 text-slate-600">
+                                {{ $report->assignee?->name ?? '—' }}
+                                @if ($report->assignee?->agency_label)<span class="block text-xs text-slate-400">{{ $report->assignee->agency_label }}</span>@endif
+                            </td>
                             <td class="px-6 py-4 text-right">
-                                <a href="{{ route('admin.reports.show', $report) }}" class="{{ $report->status->value === 'submitted' ? 'btn-primary' : 'btn-outline' }} !px-3.5 !py-2">
-                                    {{ $report->status->value === 'submitted' ? 'Tinjau' : 'Detail' }}
+                                <a href="{{ route('admin.reports.show', $report) }}" class="{{ $report->status->value === 'submitted' && ! $report->assigned_to ? 'btn-primary' : 'btn-outline' }} !px-3.5 !py-2">
+                                    {{ $report->status->value === 'submitted' && ! $report->assigned_to ? 'Disposisi' : 'Detail' }}
                                 </a>
                             </td>
                         </tr>

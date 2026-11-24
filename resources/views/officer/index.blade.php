@@ -5,8 +5,9 @@
 @section('subheading', 'Laporan yang didisposisikan kepada Anda')
 
 @section('content')
-<div class="grid grid-cols-3 gap-3 sm:gap-4">
+<div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
     @foreach ([
+        ['submitted', 'Perlu dicek', $stats['submitted'], 'search-check', 'from-slate-400 to-slate-600'],
         ['verified', 'Siap dikerjakan', $stats['verified'], 'shield-check', 'from-sky-400 to-sky-600'],
         ['in_progress', 'Sedang dikerjakan', $stats['in_progress'], 'hammer', 'from-amber-400 to-orange-500'],
         ['done', 'Selesai', $stats['done'], 'badge-check', 'from-emerald-400 to-emerald-600'],
@@ -29,7 +30,7 @@
         <div class="card flex flex-col items-center px-6 py-20 text-center">
             <span class="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50 text-brand-600"><i data-lucide="{{ $tab === 'selesai' ? 'history' : 'coffee' }}" class="h-8 w-8"></i></span>
             <h3 class="mt-5 text-xl font-extrabold text-ink">{{ $tab === 'selesai' ? 'Belum ada riwayat' : 'Tidak ada tugas aktif' }}</h3>
-            <p class="mt-2 max-w-sm text-slate-500">{{ $tab === 'selesai' ? 'Laporan yang Anda selesaikan akan muncul di sini.' : 'Tugas baru akan muncul setelah admin mendisposisikan laporan kepada Anda.' }}</p>
+            <p class="mt-2 max-w-sm text-slate-500">{{ $tab === 'selesai' ? 'Laporan yang Anda selesaikan atau tolak akan muncul di sini.' : 'Tugas baru akan muncul setelah admin mendisposisikan laporan kepada Anda.' }}</p>
         </div>
     @else
         <div class="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
@@ -50,7 +51,7 @@
                         <p class="mt-2 flex items-start gap-1.5 text-sm text-slate-500"><i data-lucide="map-pin" class="mt-0.5 h-4 w-4 shrink-0"></i><span class="line-clamp-1">{{ $task->address }}</span></p>
                         <div class="mt-auto flex items-center justify-between pt-4 text-xs text-slate-400">
                             <span>{{ $task->region->name }} · {{ $task->created_at->diffForHumans() }}</span>
-                            <span class="inline-flex items-center gap-1 text-sm font-bold text-brand-700">{{ $tab === 'selesai' ? 'Lihat' : 'Kerjakan' }} <i data-lucide="arrow-right" class="h-4 w-4"></i></span>
+                            <span class="inline-flex items-center gap-1 text-sm font-bold text-brand-700">{{ $tab === 'selesai' ? 'Lihat' : ($task->status->value === 'submitted' ? 'Periksa' : 'Kerjakan') }} <i data-lucide="arrow-right" class="h-4 w-4"></i></span>
                         </div>
                     </div>
                 </a>

@@ -18,6 +18,7 @@
             <i data-lucide="{{ $cat->icon }}" class="h-3.5 w-3.5"></i>{{ $cat->name }}
         </span>
         <x-status-badge :status="$report->status" class="absolute right-3 top-3 bg-white/95 shadow-sm backdrop-blur" />
+        <x-priority-badge :report="$report" class="absolute bottom-3 left-3 shadow-sm" />
     </a>
 
     <div class="flex flex-1 flex-col p-5">

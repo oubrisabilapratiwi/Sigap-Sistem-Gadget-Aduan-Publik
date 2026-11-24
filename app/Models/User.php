@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Agency;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,7 +20,7 @@ class User extends Authenticatable
     public const ROLE_CITIZEN = 'warga';
 
     protected $fillable = [
-        'name', 'email', 'password', 'phone', 'region_id', 'is_active',
+        'name', 'email', 'password', 'phone', 'region_id', 'agency', 'is_active',
     ];
 
     protected $hidden = [
@@ -29,6 +30,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'is_active' => 'boolean',
+        'agency' => Agency::class,
     ];
 
     /* Relasi */
@@ -92,6 +94,12 @@ class User extends Authenticatable
     {
         return Str::of($this->name)->explode(' ')->filter()->take(2)
             ->map(fn ($w) => Str::upper(Str::substr($w, 0, 1)))->implode('');
+    }
+
+    /** Nama instansi / asal dinas petugas (null bila belum diisi). */
+    public function getAgencyLabelAttribute(): ?string
+    {
+        return $this->agency?->label();
     }
 
     /** Nama yang ditampilkan ke publik: "Budi S." demi privasi pelapor. */

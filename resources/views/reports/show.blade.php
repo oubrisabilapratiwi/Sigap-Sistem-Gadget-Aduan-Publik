@@ -33,6 +33,7 @@
                         <i data-lucide="{{ $cat->icon }}" class="h-3.5 w-3.5"></i>{{ $cat->name }}
                     </span>
                     <x-status-badge :status="$report->status" />
+                    <x-priority-badge :report="$report" />
                     <button type="button" x-data="{ copied: false }"
                             @click="navigator.clipboard.writeText('{{ $report->tracking_code }}'); copied = true; setTimeout(() => copied = false, 1800)"
                             class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 transition hover:bg-slate-200" title="Salin kode pelacakan">
@@ -74,6 +75,12 @@
                 @if ($report->status->value === 'rejected' && $report->rejection_reason)
                     <div class="mt-5 rounded-2xl bg-rose-50 p-4 text-sm text-rose-800 ring-1 ring-rose-200">
                         <b>Alasan penolakan:</b> {{ $report->rejection_reason }}
+                        @if ($report->rejection_photo_url)
+                            <button type="button" onclick="openLightbox('{{ $report->rejection_photo_url }}')" class="mt-3 block overflow-hidden rounded-xl ring-1 ring-rose-200">
+                                <img src="{{ $report->rejection_photo_url }}" alt="Foto bukti kondisi asli di lokasi" loading="lazy" class="h-36 w-56 cursor-zoom-in object-cover">
+                            </button>
+                            <p class="mt-1.5 text-xs text-rose-700/80">Foto bukti kondisi asli di lokasi dari petugas.</p>
+                        @endif
                     </div>
                 @endif
             </section>
@@ -108,6 +115,7 @@
                     <p class="text-5xl font-extrabold tracking-tight text-ink"><span data-vote-count="{{ $report->id }}">{{ $report->upvotes_count }}</span></p>
                     <x-vote-button :report="$report" large />
                 </div>
+                <div class="mt-3"><x-priority-badge :report="$report" /></div>
                 <p class="mt-3 text-sm text-slate-500">
                     @if ($report->status->isFinal())
                         Dukungan ditutup karena laporan sudah {{ strtolower($report->status->label()) }}.
@@ -128,17 +136,23 @@
 
             <div class="card divide-y divide-slate-100 text-sm">
                 <div class="flex items-center justify-between gap-4 px-6 py-3.5"><span class="text-slate-500">Kategori</span><span class="font-bold text-ink">{{ $cat->name }}</span></div>
+                @if ($cat->agency)
+                    <div class="flex items-center justify-between gap-4 px-6 py-3.5"><span class="text-slate-500">Instansi penanganan</span><span class="text-right font-bold text-ink">{{ $cat->agency->label() }}</span></div>
+                @endif
                 <div class="flex items-center justify-between gap-4 px-6 py-3.5"><span class="text-slate-500">Wilayah</span><span class="font-bold text-ink">{{ $report->region->name }}</span></div>
                 <div class="flex items-center justify-between gap-4 px-6 py-3.5">
                     <span class="text-slate-500">Petugas</span>
-                    <span class="font-bold text-ink">{{ $report->assignee?->name ?? 'Belum ditugaskan' }}</span>
+                    <span class="text-right font-bold text-ink">
+                        {{ $report->assignee?->name ?? 'Belum ditugaskan' }}
+                        @if ($report->assignee?->agency_label)<span class="block text-xs font-semibold text-slate-500">{{ $report->assignee->agency_label }}</span>@endif
+                    </span>
                 </div>
                 @if ($report->completed_at)
                     <div class="flex items-center justify-between gap-4 px-6 py-3.5"><span class="text-slate-500">Selesai pada</span><span class="font-bold text-emerald-700">{{ $report->completed_at->translatedFormat('d M Y') }}</span></div>
                 @endif
             </div>
 
-            @if ($isOwner && $report->status->value === 'submitted')
+            @if ($isOwner && $report->status->value === 'submitted' && ! $report->assigned_to)
                 <form method="POST" action="{{ route('reports.destroy', $report) }}"
                       data-confirm="Laporan beserta fotonya akan dihapus permanen. Tindakan ini tidak dapat dibatalkan."
                       data-confirm-title="Hapus laporan ini?" data-confirm-ok="Ya, hapus" data-confirm-tone="danger" data-confirm-icon="delete">

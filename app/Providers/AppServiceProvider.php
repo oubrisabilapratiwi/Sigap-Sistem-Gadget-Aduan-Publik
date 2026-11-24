@@ -29,9 +29,9 @@ class AppServiceProvider extends ServiceProvider
         Schema::defaultStringLength(191);
         Paginator::defaultView('vendor.pagination.sigap');
 
-        // Badge jumlah laporan yang menunggu validasi di sidebar panel
+        // Badge jumlah laporan yang menunggu disposisi admin di sidebar panel
         View::composer('layouts.panel', function ($view) {
-            $view->with('pendingCount', Report::status(ReportStatus::Submitted)->count());
+            $view->with('pendingCount', Report::status(ReportStatus::Submitted)->whereNull('assigned_to')->count());
         });
     }
 }

@@ -17,6 +17,9 @@ class Report extends Model
 {
     use HasFactory;
 
+    /** Dukungan mencapai angka ini atau lebih = "Prioritas". */
+    public const PRIORITY_THRESHOLD = 10;
+
     protected $fillable = [
         'tracking_code', 'user_id', 'category_id', 'region_id',
         'title', 'description', 'address', 'latitude', 'longitude', 'photo',
@@ -235,12 +238,33 @@ class Report extends Model
         return $this->photo ? ImageService::url(ImageService::thumbPath($this->photo)) : null;
     }
 
+    /** Skala prioritas otomatis: dukungan >= 10 = prioritas. Selalu mengikuti upvotes_count terbaru. */
+    public function getIsPriorityAttribute(): bool
+    {
+        return (int) $this->upvotes_count >= self::PRIORITY_THRESHOLD;
+    }
+
+    public function getPriorityLabelAttribute(): string
+    {
+        return $this->is_priority ? 'Prioritas' : 'Tidak Diprioritaskan';
+    }
+
     /** Foto bukti penyelesaian dari petugas (update "done" terakhir). */
     public function getProofPhotoUrlAttribute(): ?string
     {
         $proof = $this->relationLoaded('updates')
             ? $this->updates->where('status', ReportStatus::Done)->whereNotNull('photo')->last()
             : $this->updates()->where('status', ReportStatus::Done->value)->whereNotNull('photo')->latest('id')->first();
+
+        return $proof?->photo_url;
+    }
+
+    /** Foto bukti lapangan dari petugas saat laporan ditolak (update "rejected" terakhir). */
+    public function getRejectionPhotoUrlAttribute(): ?string
+    {
+        $proof = $this->relationLoaded('updates')
+            ? $this->updates->where('status', ReportStatus::Rejected)->whereNotNull('photo')->last()
+            : $this->updates()->where('status', ReportStatus::Rejected->value)->whereNotNull('photo')->latest('id')->first();
 
         return $proof?->photo_url;
     }

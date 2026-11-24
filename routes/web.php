@@ -61,10 +61,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'can:admin.access'])
 
     Route::get('/laporan', [Admin\ReportController::class, 'index'])->name('reports.index');
     Route::get('/laporan/{report}', [Admin\ReportController::class, 'show'])->name('reports.show');
-    Route::post('/laporan/{report}/verifikasi', [Admin\ReportController::class, 'verify'])
-        ->middleware('can:report.validate')->name('reports.verify');
-    Route::post('/laporan/{report}/tolak', [Admin\ReportController::class, 'reject'])
-        ->middleware('can:report.validate')->name('reports.reject');
+    Route::post('/laporan/{report}/disposisi', [Admin\ReportController::class, 'dispose'])
+        ->middleware('can:report.assign')->name('reports.dispose');
     Route::post('/laporan/{report}/alihkan', [Admin\ReportController::class, 'reassign'])
         ->middleware('can:report.assign')->name('reports.reassign');
 

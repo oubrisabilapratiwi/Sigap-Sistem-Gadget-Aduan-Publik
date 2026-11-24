@@ -22,6 +22,7 @@ class DashboardController extends Controller
         $total = array_sum($counts);
 
         $queue = Report::status(ReportStatus::Submitted)
+            ->whereNull('assigned_to')
             ->with(['category', 'region', 'user'])
             ->mostUpvoted()
             ->limit(6)
@@ -31,7 +32,7 @@ class DashboardController extends Controller
 
         $officers = User::role(User::ROLE_OFFICER)
             ->withCount([
-                'assignedReports as active_count' => fn ($q) => $q->whereIn('status', [ReportStatus::Verified->value, ReportStatus::InProgress->value]),
+                'assignedReports as active_count' => fn ($q) => $q->whereIn('status', ReportStatus::activeValues()),
                 'assignedReports as done_count' => fn ($q) => $q->where('status', ReportStatus::Done->value),
             ])
             ->orderByDesc('active_count')
